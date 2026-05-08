@@ -1,4 +1,5 @@
 const { pool } = require("../config/database");
+const bcrypt = require("bcrypt");
 
 const loginController = async (req, res) => {
     console.log("\n=== LOGIN CONTROLLER CALLED ===");
@@ -26,11 +27,24 @@ const loginController = async (req, res) => {
         
         const userRow = rows[0];
         console.log("Found user:", userRow.email);
-        console.log("Stored password:", userRow.password);
-        console.log("Provided password:", password);
-        console.log("Match:", userRow.password === password);
         
-        if (userRow.password !== password) {
+        // Verify password using bcrypt
+        let isMatch = false;
+        try {
+            isMatch = await bcrypt.compare(password, userRow.password);
+        } catch (e) {
+            console.log("Bcrypt comparison failed (likely not a hash), trying plain text");
+        }
+
+        // Fallback for plain text passwords (during migration)
+        if (!isMatch && userRow.password === password) {
+            console.log("Plain text password match found");
+            isMatch = true;
+        }
+        
+        console.log("Match result:", isMatch);
+        
+        if (!isMatch) {
             console.log("Password does not match");
             return res.status(401).json({ message: "Invalid username/email or password" });
         }
